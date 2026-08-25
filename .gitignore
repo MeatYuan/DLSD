@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Datasets (downloaded on first run by datasets/Data.py)
+Data/
+
+# Run output: logs, per-round metrics, saved checkpoints, synthetic image dumps
+result/
+model/
+syn_images/
+*.log
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
