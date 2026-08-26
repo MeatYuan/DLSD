@@ -1,33 +1,27 @@
+from Algorithm.base import BaseClient
 import torch
 import torch.nn as nn
 import numpy as np
 import copy
 from collections import defaultdict, OrderedDict
 from torch.utils.data import DataLoader, ConcatDataset, TensorDataset
-from datasets.loader import SynDataset, ClassBatchSampler
+from datasets.loader import ProxyDataset
 from datasets.Data import Dataset_Mean_Std
-from utils.train import Train_model, Evaluate, Evaluate_with_adapter, get_global_optimizer_schedule, KL_divergence
+from utils.train import Evaluate, Evaluate_with_adapter, get_global_optimizer_schedule, KL_divergence
 from TargetModels.Adapter import AdapterMLP, AdapterConv
-from TargetModels.main import get_model
 from utils.syn import get_images, distribution_matching
-import torch.nn.functional as F
 from torchvision.utils import save_image
 import os
 from utils.train import onload_optimizer_states, offload_optimizer_states
-class Client:
-    def __init__(self, model, local_train_loader, local_test_loader, client_id, args, local_val_loader = None,device = "gpu"):
-        # client id
-        self.client_id = client_id
-        self.args = args
-
-        # local model
-        self.local_model = model
+class Client(BaseClient):
+    def __init__(self, model, local_train_loader, local_test_loader, client_id,
+                 args, device='cpu'):
+        super().__init__(model, local_train_loader, local_test_loader,
+                         client_id, args, device)
         self.optimizer = torch.optim.SGD(self.local_model.parameters(), lr=args.lr, weight_decay=args.weight_decay, momentum=args.momentum)
         # self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=50, gamma=0.5)
         self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=args.Round, eta_min=1e-5)
         # data loader
-        self.train_loader = local_train_loader
-        self.test_loader = local_test_loader
         self.local_iter = iter(self.train_loader)
         self.syn_dataset = None
         self.class_loader = None
@@ -36,7 +30,6 @@ class Client:
         self.neighbors = defaultdict(Neighbor)
         self.global_dataset = {}
 
-        self.device = device
         self.print_info()
 
         if args.with_adapter:
@@ -44,19 +37,7 @@ class Client:
         else:
             self.adapter = None
         
-    def get_id(self):
-        """Return the client ID."""
-        return self.client_id
 
-    def print_info(self):
-        """Print the client information."""
-        print("============================================")
-        print(f"Client ID: {self.client_id}")
-        print(f"Local Model: {self.local_model.__class__.__name__}")
-        print(f"Train Loader: {len(self.train_loader.dataset)}")
-        print(f"Test Loader: {len(self.test_loader.dataset)}")
-        print(f"Device: {self.device}")
-        print("============================================")
     
     def Init_neighbors(self, network_info):
         if len(network_info) == 0:
@@ -132,16 +113,16 @@ class Client:
             loss, self.image_syns = distribution_matching(image_real, self.image_syns, self.optimizer_img, args.image_channel, args.num_classes, args.image_size, args.IPC, self.device, args.random_seed, label_selected=len(self.syndata_info.labels_selected), net=copy.deepcopy(self.local_model))
             with torch.no_grad():
                 self.image_syns.data = self.image_syns.data * std + mean
-                            
+
                 # 2. Clip: 強制限制在 [0, 1]
                 self.image_syns.data.clamp_(0, 1)
-                            
+
                 # 3. Normalize: 再轉回 [-2.4, 2.7] 範圍
                 self.image_syns.data = (self.image_syns.data - mean) / std
             loss = loss / len(self.syndata_info.labels_selected)
             if it % 100 == 0:
                 print(f"Client {self.client_id} Synthetic Data Generation Iteration: {it}, Loss: {loss}")
-        
+
         virtual_images = copy.deepcopy(self.image_syns.detach().cpu())
         virtual_labels = copy.deepcopy(self.label_syns.detach().cpu().tolist())
         self.syn_dataset = TensorDataset(virtual_images, virtual_labels)
@@ -207,7 +188,7 @@ class Client:
             print(f"Client {self.client_id} has no correct predictions on synthetic data.")
             self.global_dataset[self.client_id] = ({}, rounds)
         else:
-            global_dataset = SynDataset(
+            global_dataset = ProxyDataset(
                 images=torch.cat(images_list, dim=0),
                 features=torch.cat(features_list, dim=0),
                 logits=torch.cat(logits_list, dim=0)

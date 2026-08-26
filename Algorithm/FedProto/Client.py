@@ -1,10 +1,11 @@
+from Algorithm.base import BaseClient
 import torch
 import torch.nn as nn
 from utils.train import Evaluate
 from torch.nn import CrossEntropyLoss
 
 
-class Client:
+class Client(BaseClient):
     """
     FedProto client.
     Reference: Tan et al., AAAI 2022. github.com/yuetan031/FedProto
@@ -16,11 +17,8 @@ class Client:
 
     def __init__(self, model, local_train_loader, local_test_loader,
                  client_id, args, device='cpu'):
-        self.client_id = client_id
-        self.local_model = model
-        self.train_loader = local_train_loader
-        self.test_loader = local_test_loader
-        self.device = device
+        super().__init__(model, local_train_loader, local_test_loader,
+                         client_id, args, device)
         self.train_ep = args.train_ep
         self.ld = args.ld
         self.train_samples = len(local_train_loader.dataset)
@@ -35,8 +33,6 @@ class Client:
         print(f"[FedProto] Client {client_id} | model={model.__class__.__name__} "
               f"| train={self.train_samples}")
 
-    def get_id(self):
-        return self.client_id
 
     def train(self, global_protos):
         """

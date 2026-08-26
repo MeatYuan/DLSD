@@ -1,10 +1,9 @@
 import torch
 import torch.nn as nn
-from functools import partial
 from torch import Tensor
 from torchvision.ops.misc import Conv2dNormActivation
 from torchvision.models._utils import _make_divisible
-from typing import Any, Callable, List, Optional
+from typing import Any, Callable, Optional
 
 #https://docs.pytorch.org/vision/main/_modules/torchvision/models/mobilenetv2.html#mobilenet_v2
 class InvertedResidual(nn.Module):

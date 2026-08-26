@@ -1,19 +1,14 @@
+from Algorithm.base import BaseClient
 import torch
 import torch.nn as nn
 import copy
 from utils.syn import calculate_kd_loss, Distance_loss
-from utils.train import Train_model, Evaluate
-class Client:
-    def __init__(self, model, local_train_loader, local_test_loader, kd_loader, reg_loader, client_id, local_val_loader = None,device = "gpu", args=None):
-        # client id
-        self.client_id = client_id
 
-        # local model
-        self.local_model = model
-
-        # data loader
-        self.train_loader = local_train_loader
-        self.test_loader = local_test_loader
+class Client(BaseClient):
+    def __init__(self, model, local_train_loader, local_test_loader, kd_loader,
+                 reg_loader, client_id, args, device='cpu'):
+        super().__init__(model, local_train_loader, local_test_loader,
+                         client_id, args, device)
         self.kd_loader = copy.deepcopy(kd_loader)
         self.reg_loader = copy.deepcopy(reg_loader)
 
@@ -22,23 +17,8 @@ class Client:
         self.local_kd_logits = None
         self.neighbor = {}
 
-        self.device = device
         self.print_info()
 
-    def get_id(self):
-        """Return the client ID."""
-        return self.client_id
-
-    def print_info(self):
-        """Print the client information."""
-        print("============================================")
-        print(f"Client ID: {self.client_id}")
-        print(f"Local Model: {self.local_model.__class__.__name__}")
-        print(f"Train Loader: {len(self.train_loader.dataset)}")
-        print(f"Test Loader: {len(self.test_loader.dataset)}")
-        #print(f"Validation Loader: {len(self.val_loader.dataset)}")
-        print(f"Device: {self.device}")
-        print("============================================")
 
     def Pretrain_model(self, args):
         optimizer = torch.optim.SGD(self.local_model.parameters(), lr=args.lr)
@@ -80,9 +60,6 @@ class Client:
         return {'Train Loss': train_loss, 'Train Acc': train_acc, 'Test Loss': test_loss, 'Test Acc': test_acc}
      
 
-    def evaluate(self,):
-        loss, acc = Evaluate(self.local_model, self.test_loader, device = self.device)
-        return loss, acc
     
     def calculate_kd_logits(self,):
         self.local_model = self.local_model.to(self.device)

@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import torch.nn.init as init
-from torch import Tensor
 class Fire(nn.Module):
     def __init__(self, in_channels, squeeze_channels, expand1x1_channels, expand3x3_channels):
         super(Fire, self).__init__()

@@ -4,7 +4,7 @@ import torch
 from torchvision import transforms,datasets
 from torch.utils.data import DataLoader, Dataset, Subset
 import math
-from collections import defaultdict,Counter
+from collections import Counter
 def Dataset_Mean_Std(dataset):
     if dataset == 'CIFAR10':
         mean = (0.4914, 0.4822, 0.4465)
@@ -172,26 +172,6 @@ def build_non_iid_by_dirichlet(random_state, indices2targets, non_iid_alpha, num
                     pass
         idx_batch += _idx_batch
     return idx_batch
-
-# def Split_Validation_Data(train_dataset_index, val_data_ratio, random_state):
-#         # Client train loaders
-#     client_train_loaders = []
-#     client_val_loaders = []
-#     for client_id in range(len(train_dataset_index)):
-#         random_state.shuffle(train_dataset_index[client_id])
-#         tmp = train_dataset_index[client_id]
-        
-#         split_point = int(len(tmp) * args.val_data_ratio)
-#         train_indexs = tmp[:split_point]
-#         val_indexs = tmp[split_point:]
-#         val_subset = Subset(train_dataset, val_indexs)
-#         val_loader = DataLoader(val_subset, batch_size=args.batch_size, shuffle=False)
-        
-#         train_subset = Subset(train_dataset, train_indexs)
-#         train_loader = DataLoader(train_subset, batch_size=args.batch_size, shuffle=True)
-        
-#         client_train_loaders.append(train_loader)
-#         client_val_loaders.append(val_loader)
         
 
 def Create_Data(args):
@@ -240,31 +220,13 @@ def Create_Data(args):
 
     # Client train loaders
     client_train_loaders = []
-    #client_val_loaders = []
     for client_id in range(args.num_clients):
-        # # 佔存index
-        # tmp = idx_batch[client_id]
-        
-        # # Train 和 Val 的切分點
-        # split_point = int(len(tmp) * args.train_val_data_ratio)
-        
-        # # 取得Train index 和 Val index
-        # train_indexs = tmp[:split_point]
-        # val_indexs = tmp[split_point:]
-
-        # # 產生 Val DataLoader(要用val_dataset，避免train dataset有增量導致val也跟著增量)
-        # val_subset = Subset(val_dataset, val_indexs)
-        # val_loader = DataLoader(val_subset, batch_size=args.batch_size, shuffle=False)
-        
         # # 產生 Train DataLoader
-        g = torch.Generator()
-        g.manual_seed(args.random_seed + client_id)  # 為每個客戶端設置不同的隨機種子
         train_subset = Subset(train_dataset, idx_batch[client_id])
         train_loader = DataLoader(train_subset, batch_size=args.batch_size, shuffle=True, num_workers=2)
         
         # 存放到list
         client_train_loaders.append(train_loader)
-        #client_val_loaders.append(val_loader)
 
     labels_distribution = []
     for i, indices in enumerate(idx_batch):
@@ -278,67 +240,6 @@ def Create_Data(args):
     re = {"client_train": client_train_loaders, "client_test": client_test_loaders}
 
     return re
-
-def analyze_dataloader_labels(dataloader: DataLoader) -> dict:
-    label_counts = Counter()
-    for batch in dataloader:
-        if isinstance(batch, (list, tuple)):
-            labels = batch[1]
-        elif isinstance(batch, dict):
-            labels = batch['labels']
-        else:
-            raise TypeError("Batch must be a list, tuple, or dict.")
-    
-        if isinstance(labels, torch.Tensor):
-            label_counts.update(labels.tolist())
-        else:
-            label_counts.update(labels)
-    return dict(label_counts)
-
-def assign_public_proxy_by_labels(full_public_dataset, all_public_labels, labels_selected, client_id, args):
-        """
-        full_public_dataset: 載入好的 CIFAR-100 數據集
-        all_public_labels: CIFAR-100 的所有標籤 (Tensor)
-        """
-        target_labels = labels_selected  
-    
-        public_class_mapping = {label: 50 + label for label in range(10)}
-        
-        client_images = []
-        client_labels = []
-        
-        for label in target_labels:
-            real_public_class = public_class_mapping[label]
-            
-            # 找到該 CIFAR-100 類別的所有索引
-            indices = torch.where(all_public_labels == real_public_class)[0].tolist()
-            
-            # 每個 Client 拿不同的圖 (用 client_id 做 offset)
-            start = client_id * args.IPC
-            end = (client_id + 1) * args.IPC
-            
-            # 取得圖片
-            selected_indices = indices[start:end]
-            for idx in selected_indices:
-                img, _ = full_public_dataset[idx]
-                client_images.append(img.unsqueeze(0))
-                client_labels.append(label) 
-        
-        
-        images = torch.cat(client_images, dim=0)
-        labels = torch.tensor(client_labels, dtype=torch.long)
-        print(f"Client {client_id} Public Proxy Ready. Labels: {target_labels}")
-        return images, labels
-
-def Get_Public_Dataset(args):
-    public_transform = transforms.Compose([
-    transforms.Resize(args.image_size),
-    transforms.ToTensor(),
-    transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
-])
-    full_public_ds = datasets.CIFAR100(root='./Data/CIFAR100', train=True, download=True, transform=public_transform)
-    all_public_labels = torch.tensor(full_public_ds.targets)
-    return full_public_ds, all_public_labels
 
 
 def Get_FedMD_Public_Dataset(args):

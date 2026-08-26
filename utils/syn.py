@@ -6,7 +6,7 @@ import copy
 import time
 import random
 from torch.utils.data import TensorDataset
-from TargetModels.main import get_model
+from TargetModels.main import build_model
 #From https://github.com/ubc-tea/DESA/blob/main/iterative_desa.py#L463
 
 def Generate_Client_Syn_Data(Client_dataset_loader, args):
@@ -85,7 +85,7 @@ def distribution_matching(image_real, image_syn, optimizer_img, channel, num_cla
 
     # default we use ConvNet
     if net == None:
-        net = get_model('ConvNet', args).to(device) # get a random model
+        net = build_model('ConvNet', args).to(device) # get a random model
         net.train()
         # for param in list(net.parameters()):
         #     param.requires_grad = False

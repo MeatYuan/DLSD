@@ -128,37 +128,8 @@ def Evaluate_with_adapter(model: nn.Module,  adapter: nn.Module, testloader: Dat
 
     return avg_loss, avg_acc
 
-def freeze_model_features_parameters(model: nn.Module):
-    """Freeze adapter parameters of the model."""
-    for param in model.features.parameters():
-        param.requires_grad = False
-    for param in model.features_sec.parameters():
-        param.requires_grad = False
         
-def unfreeze_model_features_parameters(model: nn.Module):
-    """Unfreeze adapter parameters of the model."""
-    for param in model.features.parameters():
-        param.requires_grad = True
-    
-    for param in model.features_sec.parameters():
-        param.requires_grad = True
 
-def freeze_all(model: nn.Module):
-    for param in model.parameters():
-        param.requires_grad = False
-
-def unfreeze_all(model: nn.Module):
-    for param in model.parameters():
-        param.requires_grad = True
-
-def update_optimizer_params(model: nn.Module, optimizer):
-    new_params = list(filter(lambda p: p.requires_grad, model.parameters()))
-
-    for group in optimizer.param_groups:
-        group["params"] = []
-
-    optimizer.param_groups[0]["params"] = new_params
-    return optimizer
 
 def get_global_optimizer_schedule(model, adapter, args):
     # for param in list(model.features.parameters()) + list(model.features_sec.parameters()):

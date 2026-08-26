@@ -1,5 +1,4 @@
-from functools import partial
-from typing import Any, Callable, Optional
+from typing import Any, Callable
 import torch
 import torch.nn as nn
 from torch import Tensor

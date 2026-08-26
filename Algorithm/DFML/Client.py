@@ -1,3 +1,4 @@
+from Algorithm.base import BaseClient
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -5,21 +6,11 @@ from copy import deepcopy
 from utils.train import Evaluate, WSM_loss, KL_divergence, offload_optimizer_states, onload_optimizer_states
 
 
-class Client:
+class Client(BaseClient):
     def __init__(self, model, local_train_loader, local_test_loader, client_id,
-                 local_val_loader=None, device="gpu", args=None):
-        # client id
-        self.client_id = client_id
-
-        # local (regular) model Wn
-        self.local_model = model
-
-        # data loader
-        self.train_loader = local_train_loader
-        self.test_loader = local_test_loader
-
-        self.device = device
-        self.args = args
+                 args, device='cpu'):
+        super().__init__(model, local_train_loader, local_test_loader,
+                         client_id, args, device)
 
         # DFML state
         self.peak_model = deepcopy(model)        # Wn_hat: frozen copy holding best global params
@@ -42,20 +33,6 @@ class Client:
             counts = counts / total
         return counts
 
-    def get_id(self):
-        """Return the client ID."""
-        return self.client_id
-
-    def print_info(self):
-        """Print the client information."""
-        print("============================================")
-        print(f"Client ID: {self.client_id}")
-        print(f"Local Model: {self.local_model.__class__.__name__}")
-        print(f"Model Size (Phi): {self.num_params}")
-        print(f"Train Loader: {len(self.train_loader.dataset)}")
-        print(f"Test Loader: {len(self.test_loader.dataset)}")
-        print(f"Device: {self.device}")
-        print("============================================")
 
     # --- accessors used by the aggregator during mutual learning ---
     def get_model(self):

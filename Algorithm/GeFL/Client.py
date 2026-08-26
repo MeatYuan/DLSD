@@ -1,10 +1,11 @@
+from Algorithm.base import BaseClient
 import torch
 import torch.nn as nn
 from utils.train import Evaluate
 from datasets.Data import Dataset_Mean_Std
 
 
-class Client:
+class Client(BaseClient):
     """
     GeFL client.
     Reference: Kang et al., IEEE TMC 2025. Code: github.com/honggkang/hetero-model-fl-gen
@@ -20,13 +21,9 @@ class Client:
 
     def __init__(self, model, local_train_loader, local_test_loader,
                  client_id, args, device='cpu'):
-        self.client_id = client_id
-        self.local_model = model
-        self.train_loader = local_train_loader
-        self.test_loader = local_test_loader
-        self.device = device
+        super().__init__(model, local_train_loader, local_test_loader,
+                         client_id, args, device)
         self.train_samples = len(local_train_loader.dataset)
-        self.args = args
         self.n_iters = max(1, self.train_samples // args.batch_size)
 
         self.criterion = nn.CrossEntropyLoss()
@@ -39,8 +36,6 @@ class Client:
         print(f"[GeFL] Client {client_id} | model={model.__class__.__name__} "
               f"| train={self.train_samples} | iters/epoch={self.n_iters}")
 
-    def get_id(self):
-        return self.client_id
 
     def _normalize_gen(self, imgs):
         """Convert GAN Tanh [-1,1] to the same space as the real dataset images."""
@@ -203,6 +198,3 @@ class Client:
     def set_model_state(self, state_dict):
         self.local_model.load_state_dict(state_dict)
 
-    def evaluate(self):
-        loss, acc = Evaluate(self.local_model, self.test_loader, device=self.device)
-        return loss, acc

@@ -1,10 +1,11 @@
+from Algorithm.base import BaseClient
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from utils.train import Evaluate
 
 
-class Client:
+class Client(BaseClient):
     """
     FedMD
     Reference: D. Li and J. Wang, "FedMD: Heterogenous Federated Learning via Model Distillation,", NeurIPS 2019.
@@ -13,12 +14,9 @@ class Client:
 
     def __init__(self, model, local_train_loader, local_test_loader,
                  client_id, args, device='cpu'):
-        self.client_id = client_id
-        self.local_model = model
+        super().__init__(model, local_train_loader, local_test_loader,
+                         client_id, args, device)
         self.optimizer = torch.optim.SGD(self.local_model.parameters(), lr=args.lr)
-
-        self.train_loader = local_train_loader
-        self.test_loader = local_test_loader
 
         self.revisit_epochs = args.revisit_epochs
         self.digest_epochs = args.digest_epochs
@@ -26,20 +24,8 @@ class Client:
         self.ce_loss = nn.CrossEntropyLoss()
         self.kd_T = args.fedmd_T
 
-        self.device = device
         self.print_info()
 
-    def get_id(self):
-        return self.client_id
-
-    def print_info(self):
-        print("============================================")
-        print(f"Client ID: {self.client_id}")
-        print(f"Local Model: {self.local_model.__class__.__name__}")
-        print(f"Train Loader: {len(self.train_loader.dataset)}")
-        print(f"Test Loader: {len(self.test_loader.dataset)}")
-        print(f"Device: {self.device}")
-        print("============================================")
 
     # ── pre-training on public data ──────────────────────────────────────────
 
@@ -138,6 +124,3 @@ class Client:
         self.local_model.eval()
         torch.cuda.empty_cache()
 
-    def evaluate(self):
-        loss, acc = Evaluate(self.local_model, self.test_loader, device=self.device)
-        return loss, acc

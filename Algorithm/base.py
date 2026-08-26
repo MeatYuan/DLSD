@@ -6,6 +6,8 @@ would otherwise be copy-pasted between them live here.
 import csv
 import os
 
+from utils.train import Evaluate
+
 
 def apply_defaults(args, configs, name):
     """Fill in an algorithm's hyperparameters, honouring three levels of precedence:
@@ -123,3 +125,40 @@ class MetricsRecorder:
             if write_header:
                 writer.writeheader()
             writer.writerow(row)
+
+
+class BaseClient:
+    """State and reporting shared by every algorithm's client.
+
+    Subclasses own the training; this holds what all of them keep anyway, plus the
+    two methods that were otherwise copied verbatim into each one. Anything an
+    algorithm needs on top -- a peak model, an adapter, a prototype cache -- belongs
+    in its own __init__ after the super() call.
+    """
+
+    def __init__(self, model, local_train_loader, local_test_loader, client_id,
+                 args, device='cpu'):
+        self.client_id = client_id
+        self.local_model = model
+        self.train_loader = local_train_loader
+        self.test_loader = local_test_loader
+        self.args = args
+        self.device = device
+
+    def get_id(self):
+        return self.client_id
+
+    def print_info(self, **extra):
+        """One line per client. The seven-line box this replaces printed 210 lines
+           before training even started, on a 30-client run."""
+        fields = {'model': self.local_model.__class__.__name__,
+                  'train': len(self.train_loader.dataset),
+                  'test': len(self.test_loader.dataset),
+                  'device': self.device,
+                  **extra}
+        print(f"Client {self.client_id:>3} | "
+              + " | ".join(f"{k}={v}" for k, v in fields.items()))
+
+    def evaluate(self):
+        """Loss and accuracy on the shared test set."""
+        return Evaluate(self.local_model, self.test_loader, device=self.device)
