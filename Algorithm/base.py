@@ -9,6 +9,62 @@ import os
 from utils.train import Evaluate
 
 
+class Losses:
+    """Weighted running means, keyed by name.
+
+    A training loop that reports k losses otherwise needs four blocks of
+    bookkeeping -- declare the epoch totals, accumulate them, divide each by its
+    sample count, average those over the epochs -- and adding one more loss means
+    touching all four. Here `add` carries the sample count with the value, so each
+    metric keeps its own denominator and the epoch layer disappears entirely:
+    accumulating across every epoch and dividing once at the end gives the same
+    number as averaging the per-epoch means, as long as the epochs see the same
+    number of samples (they do -- it is the same DataLoader).
+
+    Keeping the count per metric also removes a silent failure mode. Metrics
+    measured over different batches -- the loss on the proxy data and the loss on
+    the local data -- need different denominators, and pairing them by hand is
+    something only a careful reader would catch.
+
+        losses = Losses('loss', 'acc', 'kd')
+        losses.add('loss', loss.item(), inputs.size(0))   # value is a per-sample mean
+        losses['loss']                                    # -> weighted mean
+
+    The names are declared up front and an unknown one raises: a mistyped key would
+    otherwise open a new metric that silently reads back as 0.0.
+    """
+
+    def __init__(self, *names):
+        self._names = list(names)
+        self._sum = {name: 0.0 for name in self._names}
+        self._count = {name: 0.0 for name in self._names}
+
+    def _check(self, name):
+        if name not in self._sum:
+            raise KeyError(f"Unknown metric {name!r}. Declared: {', '.join(self._names)}")
+
+    def add(self, name, value, n=1):
+        """Record `value`, the mean over `n` samples."""
+        self._check(name)
+        self._sum[name] += value * n
+        self._count[name] += n
+
+    def merge(self, other, n=1):
+        """Fold another Losses in as a single observation of weight `n`.
+
+        Used to average client-level results into a round-level summary: every
+        client counts once, regardless of how many samples it trained on.
+        """
+        for name in other._names:
+            self._check(name)
+            self.add(name, other[name], n)
+
+    def __getitem__(self, name):
+        self._check(name)
+        count = self._count[name]
+        return self._sum[name] / count if count else 0.0
+
+
 def apply_defaults(args, configs, name):
     """Fill in an algorithm's hyperparameters, honouring three levels of precedence:
 

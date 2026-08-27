@@ -72,5 +72,4 @@ def get_target_models(args):
     return [build_model(name, args) for name in names], names
 
 
-# Kept as the name the rest of the code already imports.
-get_model = build_model
+

@@ -1,4 +1,4 @@
-from Algorithm.base import BaseClient
+from Algorithm.base import BaseClient, Losses
 import torch
 import torch.nn as nn
 import numpy as np
@@ -13,6 +13,12 @@ from utils.syn import get_images, distribution_matching
 from torchvision.utils import save_image
 import os
 from utils.train import onload_optimizer_states, offload_optimizer_states
+
+# What train_with_global_dataset() reports, named once so the client and the
+# training loop that prints it cannot drift apart.
+TRAIN_METRICS = ('loss', 'acc', 'kd', 'local', 'mse', 'ada', 'ada_ce', 'ada_align')
+
+
 class Client(BaseClient):
     def __init__(self, model, local_train_loader, local_test_loader, client_id,
                  args, device='cpu'):
@@ -261,9 +267,10 @@ class Client(BaseClient):
             module.load_state_dict(aggregated_state)
     
     def train_with_global_dataset(self, args):
+        meters = Losses(*TRAIN_METRICS)
         if len(self.global_dataset) == 0:
             print(f"Client {self.client_id} has no global dataset.")
-            return
+            return meters
         
         # dataset concat
         combined_dataset = self.Get_Global_Dataset()
@@ -282,26 +289,13 @@ class Client(BaseClient):
             target_ones = torch.ones(args.batch_size).to(self.device)
             mse = nn.MSELoss()
 
-        avg_loss = 0
-        avg_acc = 0
-        avg_kd_loss = 0
-        avg_local_loss = 0
-        avg_mse_loss = 0
-        iii = 0
-        avg_ada_loss = 0
-        avg_ada_ce_loss = 0
-        avg_ada_align_loss = 0
         for epoch in range(args.local_epochs):
-            total_loss = 0
-            total_acc = 0
-            total_size = 0
-            total_kd_loss = 0
-            total_local_loss = 0
-            total_local_size = 0
-            total_mse_loss = 0
-            total_ada_loss = 0
-            total_ada_ce_loss = 0
-            total_ada_align_loss = 0
+            # Averaged within the epoch, then across epochs. The proxy loader is
+            # iterated independently of the local one and restarted whenever it runs
+            # out, so its batch sizes -- the weights for every metric except 'local'
+            # -- vary from epoch to epoch. Pooling all the batches into a single mean
+            # would therefore weight the epochs unequally.
+            epoch_meters = Losses(*TRAIN_METRICS)
             for local_data, local_target in self.train_loader:
                 local_data, local_target = local_data.to(self.device), local_target.to(self.device)
 
@@ -337,9 +331,9 @@ class Client(BaseClient):
                     adapt_loss.backward()
                     torch.nn.utils.clip_grad_norm_(self.adapter.parameters(), max_norm=5.0)
                     self.adapter_optimizer.step()
-                    total_ada_loss += adapt_loss.item() * data.size(0) 
-                    total_ada_ce_loss += ada_ce_loss.item() * data.size(0) 
-                    total_ada_align_loss += loss_align.item() * data.size(0)
+                    epoch_meters.add('ada', adapt_loss.item(), data.size(0))
+                    epoch_meters.add('ada_ce', ada_ce_loss.item(), data.size(0))
+                    epoch_meters.add('ada_align', loss_align.item(), data.size(0))
 
                 if local_data.size(0) <= 1:
                     continue
@@ -360,45 +354,27 @@ class Client(BaseClient):
                     _, feature = self.adapter.forward(feature)
                     mse_loss = criterion_align(feature, global_feature, target_ones)
                     loss += args.global_mse_weight * mse_loss
-                    total_mse_loss += mse_loss.item() * data.size(0)
-                else:
-                    total_mse_loss = 0
-
+                    epoch_meters.add('mse', mse_loss.item(), data.size(0))
 
                 self.optimizer.zero_grad()
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(self.local_model.parameters(), max_norm=5.0)
                 self.optimizer.step()
 
-                total_loss += loss.item() * data.size(0) 
                 _, pred = torch.max(output, 1)
-                total_acc += (pred == target).sum().item()
-                total_size += data.size(0)
-                total_kd_loss += kd_loss.item() * data.size(0)
-                total_local_loss += loss_local.item() * local_data.size(0)
-                total_local_size += local_data.size(0)
+                epoch_meters.add('loss', loss.item(), data.size(0))
+                epoch_meters.add('acc', (pred == target).float().mean().item(), data.size(0))
+                epoch_meters.add('kd', kd_loss.item(), data.size(0))
+                # The local supervised loss is measured on the local batch, not the
+                # proxy batch, so it carries its own count.
+                epoch_meters.add('local', loss_local.item(), local_data.size(0))
             # self.global_scheduler.step()
             self.scheduler.step()
-            avg_ada_loss += total_ada_loss / total_size
-            avg_ada_ce_loss += total_ada_ce_loss / total_size
-            avg_ada_align_loss += total_ada_align_loss / total_size
-            avg_loss += total_loss / total_size
-            avg_acc += total_acc / total_size
-            avg_kd_loss += total_kd_loss / total_size
-            avg_mse_loss += total_mse_loss / total_size
-            avg_local_loss += total_local_loss / total_local_size
-        avg_loss /= args.local_epochs
-        avg_acc /= args.local_epochs
-        avg_kd_loss /= args.local_epochs
-        avg_local_loss /= args.local_epochs
-        avg_mse_loss /= args.local_epochs
-        avg_ada_loss /= args.local_epochs
-        avg_ada_ce_loss /= args.local_epochs
-        avg_ada_align_loss /= args.local_epochs
-        
+            meters.merge(epoch_meters)
+
         self.release()
 
-        return avg_loss, avg_acc, avg_kd_loss, avg_local_loss, avg_mse_loss, avg_ada_loss, avg_ada_ce_loss, avg_ada_align_loss
+        return meters
     
     def Get_Global_Dataset(self, ):
         dataset = [v[0] for client_id, v in self.global_dataset.items() if client_id != self.client_id]
