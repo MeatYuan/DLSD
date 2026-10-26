@@ -5,6 +5,16 @@ knowledge has to move between clients some other way. This repository holds the
 proposed method and the baselines it is compared against, all run through one entry
 point on an identical data split, model assignment, and client-participation sequence.
 
+## Environment
+
+All results were produced with the following versions:
+
+| Component | Version |
+| --- | --- |
+| Python | 3.12.7 |
+| PyTorch | 2.10.0 |
+| CUDA | 13.0 |
+
 ## Running
 
 ```bash
