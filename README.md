@@ -40,21 +40,11 @@ Datasets download themselves into `Data/` on first use.
 | --- | --- |
 | `DLSD` | This work: distribution-matched synthetic images plus an adapter shared over the client network |
 | `Local` | No communication; the lower bound |
-| `DESA` | C.-Y. Huang, K. Srinivas, X. Zhang, and X. Li, “Overcoming data and
-model heterogeneities in decentralized federated learning via synthetic
-anchors,” ICML, 2024. |
-| `DFML` | Y. H. Khalil, A. H. Estiri, M. Beitollahi, N. Asadi, S. Hemati,
-X. Li, G. Zhang, and X. Chen, “DFML: Decentralized federated
-mutual learning,” Transactions on Machine Learning Research, 2024. |
-| `FedMD` | D. Li and J. Wang, “Fedmd: Heterogenous federated learning via model
-distillation,” arXiv preprint arXiv:1910.03581, 2019. |
-| `FedProto` | Y. Tan, G. Long, L. Liu, T. Zhou, Q. Lu, J. Jiang, and C. Zhang,
-“Fedproto: Federated prototype learning across heterogeneous clients,”
-in Proceedings of the AAAI conference on artificial intelligence, vol. 36,
-no. 8, 2022, pp. 8432–8440. |
-| `GeFL` | H. Kang, S. Cha, and J. Kang, “Gefl: Model-agnostic federated learning
-with generative models,” IEEE Transactions on Mobile Computing,
-2025. |
+| `DESA` | C.-Y. Huang, K. Srinivas, X. Zhang, and X. Li, “Overcoming data and model heterogeneities in decentralized federated learning via synthetic anchors,” ICML, 2024. |
+| `DFML` | Y. H. Khalil, A. H. Estiri, M. Beitollahi, N. Asadi, S. Hemati, X. Li, G. Zhang, and X. Chen, “DFML: Decentralized federated mutual learning,” Transactions on Machine Learning Research, 2024. |
+| `FedMD` | D. Li and J. Wang, “Fedmd: Heterogenous federated learning via model distillation,” arXiv preprint arXiv:1910.03581, 2019. |
+| `FedProto` | Y. Tan, G. Long, L. Liu, T. Zhou, Q. Lu, J. Jiang, and C. Zhang, “Fedproto: Federated prototype learning across heterogeneous clients,” in Proceedings of the AAAI conference on artificial intelligence, vol. 36, no. 8, 2022, pp. 8432–8440. |
+| `GeFL` | H. Kang, S. Cha, and J. Kang, “Gefl: Model-agnostic federated learning with generative models,” IEEE Transactions on Mobile Computing, 2025. |
 
 Adding one means dropping a folder under `Algorithm/` and adding a line to
 `Algorithm/__init__.py`. Entry points are imported lazily, so a broken or half-finished
